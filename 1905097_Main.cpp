@@ -24,7 +24,7 @@ Camera camera;
 
 void loadData(){
 
-    int number, totalObjects, totalLights;
+    int number, totalObjects, totalPointLights, totalSpotLights;
 
     ifstream in("scene.txt");
 	in >> level >> number;
@@ -64,7 +64,44 @@ void loadData(){
 
             objects.push_back(object);
         }
-    } 
+
+        else if(type == "general"){
+            object = new GeneralObject();
+
+            in >> ((GeneralObject *)object)->A >> ((GeneralObject *)object)->B >> ((GeneralObject *)object)->C >> ((GeneralObject *)object)->D >> ((GeneralObject *)object)->E >> ((GeneralObject *)object)->F >> ((GeneralObject *)object)->G >> ((GeneralObject *)object)->H >> ((GeneralObject *)object)->I >> ((GeneralObject *)object)->J;
+            in >> ((GeneralObject *)object)->reference_point.x_val >> ((GeneralObject *)object)->reference_point.y_val >> ((GeneralObject *)object)->reference_point.z_val;
+            in >> ((GeneralObject *)object)->length >> ((GeneralObject *)object)->width >> ((GeneralObject *)object)->height;
+            in >> ((GeneralObject *)object)->color[0] >> ((GeneralObject *)object)->color[1] >> ((GeneralObject *)object)->color[2];
+            in >> ((GeneralObject *)object)->coEfficients[0] >> ((GeneralObject *)object)->coEfficients[1] >> ((GeneralObject *)object)->coEfficients[2] >> ((GeneralObject *)object)->coEfficients[3];
+            in >> ((GeneralObject *)object)->shine;
+
+            objects.push_back(object);
+        }
+    }
+
+    // Taking Input Point Lights
+    in >> totalPointLights;
+    for(int i = 0; i < totalPointLights; i++){
+        PointLight *pointLight = new PointLight();
+
+        in >> pointLight->light_pos.x_val >> pointLight->light_pos.y_val >> pointLight->light_pos.z_val;
+        in >> pointLight->color[0] >> pointLight->color[1] >> pointLight->color[2];
+
+        pointLights.push_back(pointLight);
+    }
+
+    // Taking Input Spot Lights
+    in >> totalSpotLights;
+    for(int i = 0; i < totalSpotLights; i++){
+        SpotLight *spotLight = new SpotLight();
+
+        in >> spotLight->point_light.light_pos.x_val >> spotLight->point_light.light_pos.y_val >> spotLight->point_light.light_pos.z_val;
+        in >> spotLight->point_light.color[0] >> spotLight->point_light.color[1] >> spotLight->point_light.color[2];
+        in >> spotLight->light_direction.x_val >> spotLight->light_direction.y_val >> spotLight->light_direction.z_val;
+        in >> spotLight->cutoff_angle;
+
+        spotlights.push_back(spotLight);
+    }
 
 	Object *floorObject = new Floor(1000, 20);
     double floorColor[3] = {0.5, 0.5, 0.5};
@@ -301,7 +338,17 @@ void display() {
     for (int i = 0; i < objects.size(); i++){
 		Object *object = objects[i];
 		object->draw();
-	} 
+	}
+
+    for (int i = 0; i < pointLights.size(); i++){
+        PointLight *pointLight = pointLights[i];
+        pointLight->drawPointLight();
+    }
+
+    for (int i = 0; i < spotlights.size(); i++){
+        SpotLight *spotLight = spotlights[i];
+        spotLight->drawSpotLight();
+    }
 
    glutSwapBuffers();
 }

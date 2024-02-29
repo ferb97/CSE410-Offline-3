@@ -387,6 +387,46 @@ class Sphere: public Object{
 };
 
 
+// General Object class inheriting Object
+class GeneralObject: public Object{
+    public:
+        double A, B, C, D, E, F, G, H, I, J;
+
+        // Constructors
+        GeneralObject(){
+            A = 0;
+            B = 0;
+            C = 0;
+            D = 0;
+            E = 0;
+            F = 0;
+            G = 0;
+            H = 0;
+            I = 0;
+            J = 0;
+        }
+
+        // General Object Constructor
+        GeneralObject(double a, double b, double c, double d, double e, double f, double g, double h, double i, double j){
+            A = a;
+            B = b;
+            C = c;
+            D = d;
+            E = e;
+            F = f;
+            G = g;
+            H = h;
+            I = i;
+            J = j;
+        }
+
+        virtual void draw(){
+            return;
+        }
+
+};
+
+
 // Floor class inheriting Object
 class Floor: public Object{
     public:
