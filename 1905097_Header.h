@@ -251,7 +251,7 @@ extern int level;
 class Object{
     public:
         Point3D reference_point; // should have x, y, z
-        double height, width, length;
+        double height, width, length, radius;
         double color[3];
         double coEfficients[4]; //ambient,diffuse,reflection coefficients
         int shine; // exponent term of specular component
@@ -321,6 +321,69 @@ class Triangle: public Object{
             glEnd();
         }
 
+};
+
+
+
+// Sphere class inheriting Object
+class Sphere: public Object{
+    public:
+        // Constructors
+        Sphere(){
+            reference_point = Point3D(0, 0, 0);
+            radius = 0;
+        }
+
+        Sphere(Point3D p, double r){
+            reference_point = p;
+            radius = r;
+        }
+
+
+        virtual void draw(){
+            int stacks = 32, sectors = 16;
+            struct Point3D spherePoints[stacks + 1][sectors + 1];
+
+            // Generate Points
+            for(int i = 0; i <= stacks; i++)
+            {
+                double height = radius * sin(((i * 1.0) / stacks) * acos(-1) / 2);
+                double r = radius * cos(((i * 1.0) / stacks) * acos(-1) / 2);
+
+                for(int j = 0; j <= sectors; j++)
+                {
+                    spherePoints[i][j] = Point3D(r * cos(((j * 1.0) / sectors) * 2 * acos(-1)), r * sin(((j * 1.0) / sectors) * 2 * acos(-1)), height);
+
+                }
+            }
+
+            // Drawing Sphere Using Quads
+            for(int i = 0; i < stacks; i++){
+                glPushMatrix();
+                glTranslatef(reference_point.x_val, reference_point.y_val, reference_point.z_val);
+                glColor3f(color[0], color[1], color[2]);
+
+                for(int j = 0; j < sectors; j++)
+                {
+                    // For Upper Sphere
+                    glBegin(GL_QUADS);
+                        glVertex3f(spherePoints[i][j].x_val, spherePoints[i][j].y_val, spherePoints[i][j].z_val);
+                        glVertex3f(spherePoints[i][j + 1].x_val, spherePoints[i][j + 1].y_val, spherePoints[i][j + 1].z_val);
+                        glVertex3f(spherePoints[i + 1][j + 1].x_val, spherePoints[i + 1][j + 1].y_val, spherePoints[i + 1][j + 1].z_val);
+                        glVertex3f(spherePoints[i + 1][j].x_val, spherePoints[i + 1][j].y_val, spherePoints[i + 1][j].z_val);
+                    glEnd();
+
+                    // For Lower Sphere
+                    glBegin(GL_QUADS);
+                        glVertex3f(spherePoints[i][j].x_val, spherePoints[i][j].y_val, -spherePoints[i][j].z_val);
+                        glVertex3f(spherePoints[i][j + 1].x_val, spherePoints[i][j + 1].y_val, -spherePoints[i][j + 1].z_val);
+                        glVertex3f(spherePoints[i + 1][j + 1].x_val, spherePoints[i + 1][j + 1].y_val, -spherePoints[i + 1][j + 1].z_val);
+                        glVertex3f(spherePoints[i + 1][j].x_val, spherePoints[i + 1][j].y_val, -spherePoints[i + 1][j].z_val);
+                    glEnd();
+                }
+                glPopMatrix();
+            }     
+        }
 };
 
 

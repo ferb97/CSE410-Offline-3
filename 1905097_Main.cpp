@@ -52,6 +52,18 @@ void loadData(){
 
             objects.push_back(object);
         }
+
+        else if(type == "sphere"){
+            object = new Sphere();
+
+            in >> ((Sphere *)object)->reference_point.x_val >> ((Sphere *)object)->reference_point.y_val >> ((Sphere *)object)->reference_point.z_val;
+            in >> ((Sphere *)object)->radius;
+            in >> ((Sphere *)object)->color[0] >> ((Sphere *)object)->color[1] >> ((Sphere *)object)->color[2];
+            in >> ((Sphere *)object)->coEfficients[0] >> ((Sphere *)object)->coEfficients[1] >> ((Sphere *)object)->coEfficients[2] >> ((Sphere *)object)->coEfficients[3];
+            in >> ((Sphere *)object)->shine;
+
+            objects.push_back(object);
+        }
     } 
 
 	Object *floorObject = new Floor(1000, 20);
