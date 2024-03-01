@@ -347,7 +347,7 @@ class Object{
                 }
 
                 lightDirection.normalizePoint();
-                Ray lightRay = Ray(intersectingPoint, lightDirection);
+                Ray lightRay = Ray(pointLights[i]->light_pos, lightDirection);
                 bool isShadow = false;
 
                 for(int j = 0; j < objects.size(); j++){
@@ -359,7 +359,7 @@ class Object{
                 }
 
                 if(!isShadow){
-                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, ray).direction) * (-1);
+                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, lightRay).direction) * (-1);
                     if(lambert < 0){
                         lambert = 0;
                     }
@@ -368,7 +368,7 @@ class Object{
                         newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * pointLights[i]->color[j];
                     }
 
-                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, lightRay.direction)));
+                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, lightRay).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, lightRay).direction, lightRay.direction)));
                     Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
                     reflectionRay.direction.normalizePoint();
 
@@ -401,7 +401,7 @@ class Object{
                 if(fabs(angle) >= spotlights[i]->cutoff_angle){
                     continue;
                 }
-                Ray lightRay = Ray(intersectingPoint, lightDirection);
+                Ray lightRay = Ray(spotlights[i]->point_light.light_pos, lightDirection);
                 bool isShadow = false;
 
                 for(int j = 0; j < objects.size(); j++){
@@ -413,7 +413,7 @@ class Object{
                 }
 
                 if(!isShadow){
-                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, ray).direction) * (-1);
+                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, lightRay).direction) * (-1);
                     if(lambert < 0){
                         lambert = 0;
                     }
@@ -422,7 +422,7 @@ class Object{
                         newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * spotlights[i]->point_light.color[j];
                     }
 
-                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, lightRay.direction)));
+                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, lightRay).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, lightRay).direction, lightRay.direction)));
                     Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
                     reflectionRay.direction.normalizePoint();
 
@@ -459,6 +459,9 @@ class Object{
                 }
 
                 if(minIndex != -1){
+                    newColorAtIntersectingPoint[0] = 0.0;
+                    newColorAtIntersectingPoint[1] = 0.0;
+                    newColorAtIntersectingPoint[2] = 0.0;
                     double t2 = objects[minIndex]->intersect(reflectionRay, newColorAtIntersectingPoint, level + 1);
                     for(int i = 0; i < 3; i++){
                         newColor[i] += coEfficients[3] * newColorAtIntersectingPoint[i];
@@ -766,7 +769,10 @@ class GeneralObject: public Object{
             if(d < 0){
                 return -1;
             }
-            else{
+
+            if(fabs(a) < 0.00001){
+                return -c / b;
+            }
                 double t1 = (-b + sqrt(d)) / (2 * a);
                 double t2 = (-b - sqrt(d)) / (2 * a);
                 double t;
@@ -784,14 +790,13 @@ class GeneralObject: public Object{
                 }
 
                 Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, t));
-                if((length != 0 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width != 0 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height != 0 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
+                if((length > 0.00001 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
                     return -1;
                 }
                 else{
                     return t;
                 }
             }
-        }
 
 };
 
