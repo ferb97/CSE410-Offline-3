@@ -6,13 +6,13 @@ using namespace std;
 
 
 // Global Variables
-int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 70;
+int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 70, countImage = 0;
 char title[] = "Ray Tracing";
 // double maxLength = 1.5, curLength = 1.5, changeRate = 0.1, fixedRadius = 0.577, radius = 0;
 // int rowPoints = 100;
 
 
-int level;
+int recursion_level;
 int imageHeight,imageWidth;
 bitmap_image image;
 
@@ -27,7 +27,7 @@ void loadData(){
     int number, totalObjects, totalPointLights, totalSpotLights;
 
     ifstream in("scene.txt");
-	in >> level >> number;
+	in >> recursion_level >> number;
 
 	imageWidth = number;
     imageHeight = number;
@@ -120,6 +120,70 @@ void initGL(){
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnable(GL_DEPTH_TEST);
+}
+
+
+// Capture Function
+void capture(){
+    cout << "Starting Capturing Image" << endl;
+
+    // Set initial image and background color to black
+    for(int i = 0; i < imageWidth; i++){
+        for(int j = 0; j < imageHeight; j++){
+            image.set_pixel(i, j, 0, 0, 0);
+        }
+    }
+
+    double angleOfView = 80;
+    double planeDistance = (imageHeight / 2.0) / tan((angleOfView / 2.0) * acos(-1) / 180.0);  
+    Point3D topLeft = camera.getTopLeftPoint(planeDistance, window_width, window_height);
+
+    double du = (window_width * 1.0) / imageWidth;
+    double dv = (window_height * 1.0) / imageHeight;
+
+    topLeft = addTwoPoints(topLeft, multiplyPointWithNumber(camera.right_dir, du / 2.0));
+    topLeft = subtractTwoPoints(topLeft, multiplyPointWithNumber(camera.up_dir, dv / 2.0));
+
+    for(int i = 0; i < imageWidth; i++){
+        for(int j = 0; j < imageHeight; j++){
+            Point3D currentPixel = addTwoPoints(topLeft, multiplyPointWithNumber(camera.right_dir, i * du));
+            currentPixel = subtractTwoPoints(currentPixel, multiplyPointWithNumber(camera.up_dir, j * dv));
+
+            Ray ray = Ray(camera.eye_pos, subtractTwoPoints(currentPixel, camera.eye_pos));
+            ray.direction.normalizePoint();
+            double newColor[3] = {0.0, 0.0, 0.0};
+
+            double tMin = 1000000000, nearestObject = -1;
+            for(int k = 0; k < objects.size(); k++){
+                double t = objects[k]->intersect(ray, newColor, 0);
+                if(t > 0 && (t < tMin || nearestObject == -1)){
+                    tMin = t;
+                    nearestObject = k;
+                }
+            }
+
+            if(nearestObject != -1){
+                newColor[0] = 0.0;
+                newColor[1] = 0.0;
+                newColor[2] = 0.0;
+
+                double t = objects[nearestObject]->intersect(ray, newColor, 1);
+                newColor[0] = min(1.0, newColor[0]);
+                newColor[0] = max(0.0, newColor[0]);
+                newColor[1] = min(1.0, newColor[1]);
+                newColor[1] = max(0.0, newColor[1]);
+                newColor[2] = min(1.0, newColor[2]);
+                newColor[2] = max(0.0, newColor[2]);
+
+                image.set_pixel(i, j, newColor[0] * 255, newColor[1] * 255, newColor[2] * 255);
+            }
+
+        }
+    }
+
+    countImage++;
+    image.save_image("Output_2" + to_string(countImage) + ".bmp");
+	cout<<"Image Saved"<<endl;	
 }
 
 
@@ -375,6 +439,9 @@ void animate(){
 void keyboardListener(unsigned char key, int x, int y){
     switch(key){
 
+        case '0':
+            capture();
+            break;
 
         case '1':
             camera.lookLeft();

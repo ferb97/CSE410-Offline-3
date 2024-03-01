@@ -74,6 +74,11 @@ Point3D multiplyTwoPoints(Point3D point1, Point3D point2){
     return point3;
 }
 
+// Dot product of two points
+double dotProductOfTwoPoints(Point3D point1, Point3D point2){
+    return (point1.x_val * point2.x_val + point1.y_val * point2.y_val + point1.z_val * point2.z_val);
+}
+
 
 // // Global Variables
 // int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 70;
@@ -92,8 +97,8 @@ struct Camera
     // Constructor
     Camera(){
         eye_pos = Point3D(300, 50, 100);
-        lookat_dir = Point3D(-1, 0, 0);
-        right_dir = Point3D(0, 1, 0);
+        lookat_dir = Point3D(-1 / sqrt(2), -1 / sqrt(2), 0);
+        right_dir = Point3D(-1 / sqrt(2), 1 / sqrt(2), 0);
         up_dir = Point3D(0, 0, 1);
     }
 
@@ -156,6 +161,14 @@ struct Camera
     void tiltClockwise(){
         up_dir = addTwoPoints(multiplyPointWithNumber(up_dir, cos(-changeRate)), multiplyPointWithNumber(right_dir, sin(-changeRate)));
         right_dir = subtractTwoPoints(multiplyPointWithNumber(right_dir, cos(-changeRate)), multiplyPointWithNumber(up_dir, sin(-changeRate)));
+    }
+
+    Point3D getTopLeftPoint(double planeDistance, double window_width, double window_height){
+        Point3D topLeftPoint = eye_pos;
+        topLeftPoint = addTwoPoints(topLeftPoint, multiplyPointWithNumber(lookat_dir, planeDistance));
+        topLeftPoint = addTwoPoints(topLeftPoint, multiplyPointWithNumber(right_dir, -window_width / 2));
+        topLeftPoint = addTwoPoints(topLeftPoint, multiplyPointWithNumber(up_dir, window_height / 2));
+        return topLeftPoint;
     }
 
 };
@@ -246,7 +259,7 @@ class Object;
 extern vector <Object*> objects;
 extern vector <PointLight*> pointLights;
 extern vector <SpotLight*> spotlights;
-extern int level;
+extern int recursion_level;
 
 class Object{
     public:
@@ -272,6 +285,20 @@ class Object{
         }
 
         virtual void draw() = 0;
+        virtual Ray normalRayAtPoint(Point3D point, Ray ray) = 0;
+        virtual double getIntersectingTValue(Ray ray) = 0;
+
+        virtual double getColorRedAt(Point3D point){
+            return color[0];
+        }
+
+        virtual double getColorGreenAt(Point3D point){
+            return color[1];
+        }  
+
+        virtual double getColorBlueAt(Point3D point){
+            return color[2];
+        }
 
         void setColor(double color[]){
             for(int i = 0; i < 3; i++){
@@ -287,6 +314,159 @@ class Object{
             for(int i = 0; i < 4; i++){
                 this->coEfficients[i] = coEfficients[i];
             }
+        }
+
+        double intersect(Ray ray, double (&newColor)[3], int level){
+            double t = getIntersectingTValue(ray);
+
+            if(t < 0){
+                return -1;
+            }
+
+            if(level == 0){
+                return t;
+            }
+
+            Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, t));
+            double colorAtIntersectingPoint[3];
+
+            colorAtIntersectingPoint[0] = getColorRedAt(intersectingPoint);
+            colorAtIntersectingPoint[1] = getColorGreenAt(intersectingPoint);
+            colorAtIntersectingPoint[2] = getColorBlueAt(intersectingPoint);
+
+            // Setting up ambient color
+            for(int i = 0; i < 3; i++){
+                newColor[i] = coEfficients[0] * colorAtIntersectingPoint[i];
+            }
+
+            for(int i = 0; i < pointLights.size(); i++){
+                Point3D lightDirection = subtractTwoPoints(intersectingPoint, pointLights[i]->light_pos);
+                double distanceWithLight = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
+                if(distanceWithLight < 0.00001){
+                    continue;
+                }
+
+                lightDirection.normalizePoint();
+                Ray lightRay = Ray(intersectingPoint, lightDirection);
+                bool isShadow = false;
+
+                for(int j = 0; j < objects.size(); j++){
+                    double t1 = objects[j]->getIntersectingTValue(lightRay);
+                    if(t1 > 0 && t1 + 0.00001 < distanceWithLight){
+                        isShadow = true;
+                        break;
+                    }
+                }
+
+                if(!isShadow){
+                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, ray).direction) * (-1);
+                    if(lambert < 0){
+                        lambert = 0;
+                    }
+
+                    for(int j = 0; j < 3; j++){
+                        newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * pointLights[i]->color[j];
+                    }
+
+                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, lightRay.direction)));
+                    Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
+                    reflectionRay.direction.normalizePoint();
+
+                    double phong = dotProductOfTwoPoints(reflectionRay.direction, ray.direction) * (-1);
+                    if(phong < 0){
+                        phong = 0;
+                    }
+
+                    for(int j = 0; j < 3; j++){
+                        newColor[j] += coEfficients[2] * pow(phong, shine) * pointLights[i]->color[j] * colorAtIntersectingPoint[j];
+                    }
+                }
+            }
+
+            for(int i = 0; i < spotlights.size(); i++){
+                Point3D lightDirection = subtractTwoPoints(intersectingPoint, spotlights[i]->point_light.light_pos);
+                double distanceWithLight = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
+                if(distanceWithLight < 0.00001){
+                    continue;
+                }
+
+                lightDirection.normalizePoint();
+
+                double numerator = dotProductOfTwoPoints(lightDirection, spotlights[i]->light_direction);
+                double denominator = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
+                denominator *= sqrt(spotlights[i]->light_direction.x_val * spotlights[i]->light_direction.x_val + spotlights[i]->light_direction.y_val * spotlights[i]->light_direction.y_val + spotlights[i]->light_direction.z_val * spotlights[i]->light_direction.z_val);
+
+                double angle = acos(numerator / denominator) * (180 / acos(-1));
+
+                if(fabs(angle) >= spotlights[i]->cutoff_angle){
+                    continue;
+                }
+                Ray lightRay = Ray(intersectingPoint, lightDirection);
+                bool isShadow = false;
+
+                for(int j = 0; j < objects.size(); j++){
+                    double t1 = objects[j]->getIntersectingTValue(lightRay);
+                    if(t1 > 0 && t1 + 0.00001 < distanceWithLight){
+                        isShadow = true;
+                        break;
+                    }
+                }
+
+                if(!isShadow){
+                    double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, ray).direction) * (-1);
+                    if(lambert < 0){
+                        lambert = 0;
+                    }
+
+                    for(int j = 0; j < 3; j++){
+                        newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * spotlights[i]->point_light.color[j];
+                    }
+
+                    Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, lightRay.direction)));
+                    Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
+                    reflectionRay.direction.normalizePoint();
+
+                    double phong = dotProductOfTwoPoints(reflectionRay.direction, ray.direction) * (-1);
+                    if(phong < 0){
+                        phong = 0;
+                    }
+
+                    for(int j = 0; j < 3; j++){
+                        newColor[j] += coEfficients[2] * pow(phong, shine) * spotlights[i]->point_light.color[j] * colorAtIntersectingPoint[j];
+                    }
+                }
+
+            }
+
+            if(level < recursion_level){
+                Point3D reflectionRayDirection = subtractTwoPoints(ray.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, ray.direction)));
+                Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
+                reflectionRay.direction.normalizePoint();
+
+                reflectionRay.start_point = addTwoPoints(reflectionRay.start_point, multiplyPointWithNumber(reflectionRay.direction, 0.00001));
+
+                double newColorAtIntersectingPoint[3] = {0.0, 0.0, 0.0};
+                double t1 = -1;
+                double minT = 1000000000;
+                int minIndex = -1;
+
+                for(int i = 0; i < objects.size(); i++){
+                    t1 = objects[i]->intersect(reflectionRay, newColor, 0);
+                    if(t1 > 0 && t1 < minT){
+                        minT = t1;
+                        minIndex = i;
+                    }
+                }
+
+                if(minIndex != -1){
+                    double t2 = objects[minIndex]->intersect(reflectionRay, newColorAtIntersectingPoint, level + 1);
+                    for(int i = 0; i < 3; i++){
+                        newColor[i] += coEfficients[3] * newColorAtIntersectingPoint[i];
+                    }
+                }
+            }
+
+            return t;
         }
 
 };
@@ -319,6 +499,95 @@ class Triangle: public Object{
                 glVertex3f(points[2].x_val, points[2].y_val, points[2].z_val);
             }
             glEnd();
+        }
+
+        virtual Ray normalRayAtPoint(Point3D point, Ray ray){
+            Point3D normal = multiplyTwoPoints(subtractTwoPoints(points[1], points[0]), subtractTwoPoints(points[2], points[0]));
+            normal.normalizePoint();
+
+            if(dotProductOfTwoPoints(normal, ray.direction) < 0){
+                normal = multiplyPointWithNumber(normal, -1);
+            }
+
+            Ray normalRay = Ray(point, normal);
+            return normalRay;
+        }
+
+        virtual double getIntersectingTValue(Ray ray){
+            double betaMatrix[3][3], gammaMatrix[3][3], tMatrix[3][3], aMatrix[3][3];
+
+            // Forming beta matrix
+            betaMatrix[0][0] = points[0].x_val - ray.start_point.x_val;
+            betaMatrix[0][1] = points[0].x_val - points[2].x_val;
+            betaMatrix[0][2] = ray.direction.x_val;
+            betaMatrix[1][0] = points[0].y_val - ray.start_point.y_val;
+            betaMatrix[1][1] = points[0].y_val - points[2].y_val;
+            betaMatrix[1][2] = ray.direction.y_val;
+            betaMatrix[2][0] = points[0].z_val - ray.start_point.z_val;
+            betaMatrix[2][1] = points[0].z_val - points[2].z_val;
+            betaMatrix[2][2] = ray.direction.z_val;
+
+            // Forming gamma matrix
+            gammaMatrix[0][0] = points[0].x_val - points[1].x_val;
+            gammaMatrix[0][1] = points[0].x_val - ray.start_point.x_val;
+            gammaMatrix[0][2] = ray.direction.x_val;
+            gammaMatrix[1][0] = points[0].y_val - points[1].y_val;
+            gammaMatrix[1][1] = points[0].y_val - ray.start_point.y_val;
+            gammaMatrix[1][2] = ray.direction.y_val;
+            gammaMatrix[2][0] = points[0].z_val - points[1].z_val;
+            gammaMatrix[2][1] = points[0].z_val - ray.start_point.z_val;
+            gammaMatrix[2][2] = ray.direction.z_val;
+
+            // Forming t matrix
+            tMatrix[0][0] = points[0].x_val - points[1].x_val;
+            tMatrix[0][1] = points[0].x_val - points[2].x_val;
+            tMatrix[0][2] = points[0].x_val - ray.start_point.x_val;
+            tMatrix[1][0] = points[0].y_val - points[1].y_val;
+            tMatrix[1][1] = points[0].y_val - points[2].y_val;
+            tMatrix[1][2] = points[0].y_val - ray.start_point.y_val;
+            tMatrix[2][0] = points[0].z_val - points[1].z_val;
+            tMatrix[2][1] = points[0].z_val - points[2].z_val;
+            tMatrix[2][2] = points[0].z_val - ray.start_point.z_val;
+
+            // Forming a matrix
+            aMatrix[0][0] = points[0].x_val - points[1].x_val;
+            aMatrix[0][1] = points[0].x_val - points[2].x_val;
+            aMatrix[0][2] = ray.direction.x_val;
+            aMatrix[1][0] = points[0].y_val - points[1].y_val;
+            aMatrix[1][1] = points[0].y_val - points[2].y_val;
+            aMatrix[1][2] = ray.direction.y_val;
+            aMatrix[2][0] = points[0].z_val - points[1].z_val;
+            aMatrix[2][1] = points[0].z_val - points[2].z_val;
+            aMatrix[2][2] = ray.direction.z_val;
+
+            // Get value of determinants
+            double betaDeterminant = betaMatrix[0][0] * (betaMatrix[1][1] * betaMatrix[2][2] - betaMatrix[1][2] * betaMatrix[2][1]);
+            betaDeterminant -= betaMatrix[0][1] * (betaMatrix[1][0] * betaMatrix[2][2] - betaMatrix[1][2] * betaMatrix[2][0]);
+            betaDeterminant += betaMatrix[0][2] * (betaMatrix[1][0] * betaMatrix[2][1] - betaMatrix[1][1] * betaMatrix[2][0]);
+
+            double gammaDeterminant = gammaMatrix[0][0] * (gammaMatrix[1][1] * gammaMatrix[2][2] - gammaMatrix[1][2] * gammaMatrix[2][1]);
+            gammaDeterminant -= gammaMatrix[0][1] * (gammaMatrix[1][0] * gammaMatrix[2][2] - gammaMatrix[1][2] * gammaMatrix[2][0]);
+            gammaDeterminant += gammaMatrix[0][2] * (gammaMatrix[1][0] * gammaMatrix[2][1] - gammaMatrix[1][1] * gammaMatrix[2][0]);
+
+            double tDeterminant = tMatrix[0][0] * (tMatrix[1][1] * tMatrix[2][2] - tMatrix[1][2] * tMatrix[2][1]);
+            tDeterminant -= tMatrix[0][1] * (tMatrix[1][0] * tMatrix[2][2] - tMatrix[1][2] * tMatrix[2][0]);
+            tDeterminant += tMatrix[0][2] * (tMatrix[1][0] * tMatrix[2][1] - tMatrix[1][1] * tMatrix[2][0]);
+
+            double aDeterminant = aMatrix[0][0] * (aMatrix[1][1] * aMatrix[2][2] - aMatrix[1][2] * aMatrix[2][1]);
+            aDeterminant -= aMatrix[0][1] * (aMatrix[1][0] * aMatrix[2][2] - aMatrix[1][2] * aMatrix[2][0]);
+            aDeterminant += aMatrix[0][2] * (aMatrix[1][0] * aMatrix[2][1] - aMatrix[1][1] * aMatrix[2][0]);
+
+            // Get value of t
+            double t = tDeterminant / aDeterminant;
+            double beta = betaDeterminant / aDeterminant;
+            double gamma = gammaDeterminant / aDeterminant;
+
+            if(beta + gamma < 1 && beta > 0 && gamma > 0 && t > 0){
+                return t;
+            }
+            else{
+                return -1;
+            }   
         }
 
 };
@@ -384,6 +653,40 @@ class Sphere: public Object{
                 glPopMatrix();
             }     
         }
+
+        virtual Ray normalRayAtPoint(Point3D point, Ray radius){
+            Point3D normal = subtractTwoPoints(point, reference_point);
+            normal.normalizePoint();
+            Ray normalRay = Ray(point, normal);
+            return normalRay;
+        }
+
+        virtual double getIntersectingTValue(Ray ray){
+            double a = 1;
+            double b = 2 * (ray.direction.x_val * (ray.start_point.x_val - reference_point.x_val) + ray.direction.y_val * (ray.start_point.y_val - reference_point.y_val) + ray.direction.z_val * (ray.start_point.z_val - reference_point.z_val));
+            double c = (ray.start_point.x_val - reference_point.x_val) * (ray.start_point.x_val - reference_point.x_val) + (ray.start_point.y_val - reference_point.y_val) * (ray.start_point.y_val - reference_point.y_val) + (ray.start_point.z_val - reference_point.z_val) * (ray.start_point.z_val - reference_point.z_val) - radius * radius;
+
+            double d = b * b - 4 * a * c;
+            if(d < 0){
+                return -1;
+            }
+            else{
+                double t1 = (-b + sqrt(d)) / (2 * a);
+                double t2 = (-b - sqrt(d)) / (2 * a);
+                if(t1 < 0 && t2 < 0){
+                    return -1;
+                }
+                else if(t1 < 0){
+                    return t2;
+                }
+                else if(t2 < 0){
+                    return t1;
+                }
+                else{
+                    return min(t1, t2);
+                }
+            }
+        }
 };
 
 
@@ -424,6 +727,72 @@ class GeneralObject: public Object{
             return;
         }
 
+        virtual Ray normalRayAtPoint(Point3D point, Ray ray){
+            Point3D normal = Point3D(2 * A * point.x_val + D * point.y_val + E * point.z_val + G, 2 * B * point.y_val + D * point.x_val + F * point.z_val + H, 2 * C * point.z_val + E * point.x_val + F * point.y_val + I);
+            normal.normalizePoint();
+            Ray normalRay = Ray(point, normal);
+            return normalRay;
+        }
+
+        virtual double getIntersectingTValue(Ray ray){
+
+            double a = A * ray.direction.x_val * ray.direction.x_val; 
+            a += B * ray.direction.y_val * ray.direction.y_val; 
+            a += C * ray.direction.z_val * ray.direction.z_val;
+            a += D * ray.direction.x_val * ray.direction.y_val;
+            a += E * ray.direction.x_val * ray.direction.z_val;
+            a += F * ray.direction.y_val * ray.direction.z_val;
+
+            double b = 2 * (A * ray.start_point.x_val * ray.direction.x_val + B * ray.start_point.y_val * ray.direction.y_val + C * ray.start_point.z_val * ray.direction.z_val);
+            b += D * (ray.start_point.x_val * ray.direction.y_val + ray.start_point.y_val * ray.direction.x_val);
+            b += E * (ray.start_point.x_val * ray.direction.z_val + ray.start_point.z_val * ray.direction.x_val);
+            b += F * (ray.start_point.y_val * ray.direction.z_val + ray.start_point.z_val * ray.direction.y_val);
+            b += G * ray.direction.x_val;
+            b += H * ray.direction.y_val;
+            b += I * ray.direction.z_val;
+
+            double c = A * ray.start_point.x_val * ray.start_point.x_val;
+            c += B * ray.start_point.y_val * ray.start_point.y_val;
+            c += C * ray.start_point.z_val * ray.start_point.z_val;
+            c += D * ray.start_point.x_val * ray.start_point.y_val;
+            c += E * ray.start_point.x_val * ray.start_point.z_val;
+            c += F * ray.start_point.y_val * ray.start_point.z_val;
+            c += G * ray.start_point.x_val;
+            c += H * ray.start_point.y_val;
+            c += I * ray.start_point.z_val;
+            c += J;
+
+            double d = b * b - 4 * a * c;
+            if(d < 0){
+                return -1;
+            }
+            else{
+                double t1 = (-b + sqrt(d)) / (2 * a);
+                double t2 = (-b - sqrt(d)) / (2 * a);
+                double t;
+                if(t1 < 0 && t2 < 0){
+                    return -1;
+                }
+                else if(t1 < 0){
+                    t = t2;
+                }
+                else if(t2 < 0){
+                    t = t1;
+                }
+                else{
+                    t = min(t1, t2);
+                }
+
+                Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, t));
+                if((length != 0 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width != 0 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height != 0 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
+                    return -1;
+                }
+                else{
+                    return t;
+                }
+            }
+        }
+
 };
 
 
@@ -440,7 +809,7 @@ class Floor: public Object{
         }
 
         Floor(double floorWidth, double tileWidth){
-            reference_point = Point3D(-floorWidth / 2, -floorWidth / 2, 0);
+            reference_point = Point3D(-floorWidth / 2.0, -floorWidth / 2.0, 0);
             length = tileWidth;
             totalNumberOfTiles = floorWidth / tileWidth;
         }
@@ -467,6 +836,69 @@ class Floor: public Object{
                 }
                 x = reference_point.x_val;
                 y += length;
+            }
+        }
+
+        virtual Ray normalRayAtPoint(Point3D point, Ray ray){
+            if(ray.direction.z_val > 0){
+                Point3D normal = Point3D(0, 0, 1);
+                normal.normalizePoint();
+                Ray normalRay = Ray(point, normal);
+                return normalRay;
+            }
+            else{
+                Point3D normal = Point3D(0, 0, -1);
+                normal.normalizePoint();
+                Ray normalRay = Ray(point, normal);
+                return normalRay;
+            }   
+        }
+
+        virtual double getIntersectingTValue(Ray ray){
+            if(ray.direction.z_val == 0){
+                return -1;
+            }
+            else{
+                double t = -ray.start_point.z_val / ray.direction.z_val;
+                if(t < 0){
+                    return -1;
+                }
+                else{
+                    return t;
+                }
+            }
+        }
+
+        virtual double getColorRedAt(Point3D point){
+            int tile_x = (point.x_val - reference_point.x_val) / length;
+            int tile_y = (point.y_val - reference_point.y_val) / length;
+            if((tile_x + tile_y) % 2 != 0 || tile_x < 0 || tile_y < 0 || tile_x >= totalNumberOfTiles || tile_y >= totalNumberOfTiles){
+                return 0;
+            }
+            else{
+                return 1;
+            }
+        }
+
+        virtual double getColorGreenAt(Point3D point){
+            int tile_x = (point.x_val - reference_point.x_val) / length;
+            int tile_y = (point.y_val - reference_point.y_val) / length;
+            if((tile_x + tile_y) % 2 != 0 || tile_x < 0 || tile_y < 0 || tile_x >= totalNumberOfTiles || tile_y >= totalNumberOfTiles){
+                return 0;
+            }
+            else{
+                return 1;
+            }
+        }
+
+        virtual double getColorBlueAt(Point3D point){
+            int tile_x = (point.x_val - reference_point.x_val) / length;
+            int tile_y = (point.y_val - reference_point.y_val) / length;
+            if((tile_x + tile_y) % 2 != 0 || tile_x < 0 || tile_y < 0 || tile_x >= totalNumberOfTiles || tile_y >= totalNumberOfTiles){
+                return 0;
+            }
+            else{
+                return 1;
             }
         }
 
