@@ -81,12 +81,7 @@ double dotProductOfTwoPoints(Point3D point1, Point3D point2){
 
 
 // // Global Variables
-// int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 70;
-// char title[] = "Magic Cube";
-// GLfloat rotateAngle = 45.0;
-// double maxLength = 1.5, curLength = 1.5, changeRate = 0.1, fixedRadius = 0.577, radius = 0;
 double changeRate = 0.1;
-// int rowPoints = 100;
 
 
 // Camera Implementation
@@ -163,6 +158,7 @@ struct Camera
         right_dir = subtractTwoPoints(multiplyPointWithNumber(right_dir, cos(-changeRate)), multiplyPointWithNumber(up_dir, sin(-changeRate)));
     }
 
+    // Get Top Left Point
     Point3D getTopLeftPoint(double planeDistance, double window_width, double window_height){
         Point3D topLeftPoint = eye_pos;
         topLeftPoint = addTwoPoints(topLeftPoint, multiplyPointWithNumber(lookat_dir, planeDistance));
@@ -256,19 +252,23 @@ struct Ray{
 
 class Object;
 
+// Import necessary vectors
 extern vector <Object*> objects;
 extern vector <PointLight*> pointLights;
 extern vector <SpotLight*> spotlights;
 extern int recursion_level;
 
+
+// Object Class
 class Object{
     public:
-        Point3D reference_point; // should have x, y, z
+        Point3D reference_point; // reference point of the object
         double height, width, length, radius;
         double color[3];
-        double coEfficients[4]; //ambient,diffuse,reflection coefficients
+        double coEfficients[4]; // 0 = ambient, 1 = diffuse, 2 = specular, 3 = reflection
         int shine; // exponent term of specular component
 
+        // Constructors
         Object(){
             reference_point = Point3D(0,0,0);
             height = 0;
@@ -284,10 +284,12 @@ class Object{
             shine = 0;
         }
 
+        // Virtual Functions
         virtual void draw() = 0;
         virtual Ray normalRayAtPoint(Point3D point, Ray ray) = 0;
         virtual double getIntersectingTValue(Ray ray) = 0;
 
+        // The virtual functions getColorAt should be implemented in the floor class
         virtual double getColorRedAt(Point3D point){
             return color[0];
         }
@@ -300,6 +302,7 @@ class Object{
             return color[2];
         }
 
+        // Setters
         void setColor(double color[]){
             for(int i = 0; i < 3; i++){
                 this->color[i] = color[i];
@@ -316,20 +319,26 @@ class Object{
             }
         }
 
+        // Intersect Function, which is common for all object classes
         double intersect(Ray ray, double (&newColor)[3], int level){
+
+            // Get value of t
             double t = getIntersectingTValue(ray);
 
             if(t < 0){
                 return -1;
             }
 
+            // If level equals to zero, return the value of t
             if(level == 0){
                 return t;
             }
 
+            // Get the intersecting point
             Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, t));
-            double colorAtIntersectingPoint[3];
 
+            // Get the color at the intersecting point
+            double colorAtIntersectingPoint[3];
             colorAtIntersectingPoint[0] = getColorRedAt(intersectingPoint);
             colorAtIntersectingPoint[1] = getColorGreenAt(intersectingPoint);
             colorAtIntersectingPoint[2] = getColorBlueAt(intersectingPoint);
@@ -339,7 +348,10 @@ class Object{
                 newColor[i] = coEfficients[0] * colorAtIntersectingPoint[i];
             }
 
+            // Calculate for each point light
             for(int i = 0; i < pointLights.size(); i++){
+
+                // Get the direction of the light
                 Point3D lightDirection = subtractTwoPoints(intersectingPoint, pointLights[i]->light_pos);
                 double distanceWithLight = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
                 if(distanceWithLight < 0.00001){
@@ -459,9 +471,6 @@ class Object{
                 }
 
                 if(minIndex != -1){
-                    newColorAtIntersectingPoint[0] = 0.0;
-                    newColorAtIntersectingPoint[1] = 0.0;
-                    newColorAtIntersectingPoint[2] = 0.0;
                     double t2 = objects[minIndex]->intersect(reflectionRay, newColorAtIntersectingPoint, level + 1);
                     for(int i = 0; i < 3; i++){
                         newColor[i] += coEfficients[3] * newColorAtIntersectingPoint[i];
@@ -493,6 +502,7 @@ class Triangle: public Object{
             points[2] = p2;
         }
 
+        // Draw Function for triangle
         virtual void draw(){
             glColor3f(color[0], color[1], color[2]);
             glBegin(GL_TRIANGLES);
@@ -504,6 +514,7 @@ class Triangle: public Object{
             glEnd();
         }
 
+        // Calculating Normal at a point for a triangle
         virtual Ray normalRayAtPoint(Point3D point, Ray ray){
             Point3D normal = multiplyTwoPoints(subtractTwoPoints(points[1], points[0]), subtractTwoPoints(points[2], points[0]));
             normal.normalizePoint();
@@ -512,11 +523,14 @@ class Triangle: public Object{
                 normal = multiplyPointWithNumber(normal, -1);
             }
 
+            // Normal Ray
             Ray normalRay = Ray(point, normal);
             return normalRay;
         }
 
         virtual double getIntersectingTValue(Ray ray){
+
+            // All the matrices needed for intersection point calculation
             double betaMatrix[3][3], gammaMatrix[3][3], tMatrix[3][3], aMatrix[3][3];
 
             // Forming beta matrix
@@ -563,19 +577,22 @@ class Triangle: public Object{
             aMatrix[2][1] = points[0].z_val - points[2].z_val;
             aMatrix[2][2] = ray.direction.z_val;
 
-            // Get value of determinants
+            // Get value of beta determinant
             double betaDeterminant = betaMatrix[0][0] * (betaMatrix[1][1] * betaMatrix[2][2] - betaMatrix[1][2] * betaMatrix[2][1]);
             betaDeterminant -= betaMatrix[0][1] * (betaMatrix[1][0] * betaMatrix[2][2] - betaMatrix[1][2] * betaMatrix[2][0]);
             betaDeterminant += betaMatrix[0][2] * (betaMatrix[1][0] * betaMatrix[2][1] - betaMatrix[1][1] * betaMatrix[2][0]);
 
+            // Get value of gamma determinant
             double gammaDeterminant = gammaMatrix[0][0] * (gammaMatrix[1][1] * gammaMatrix[2][2] - gammaMatrix[1][2] * gammaMatrix[2][1]);
             gammaDeterminant -= gammaMatrix[0][1] * (gammaMatrix[1][0] * gammaMatrix[2][2] - gammaMatrix[1][2] * gammaMatrix[2][0]);
             gammaDeterminant += gammaMatrix[0][2] * (gammaMatrix[1][0] * gammaMatrix[2][1] - gammaMatrix[1][1] * gammaMatrix[2][0]);
 
+            // Get value of t determinant
             double tDeterminant = tMatrix[0][0] * (tMatrix[1][1] * tMatrix[2][2] - tMatrix[1][2] * tMatrix[2][1]);
             tDeterminant -= tMatrix[0][1] * (tMatrix[1][0] * tMatrix[2][2] - tMatrix[1][2] * tMatrix[2][0]);
             tDeterminant += tMatrix[0][2] * (tMatrix[1][0] * tMatrix[2][1] - tMatrix[1][1] * tMatrix[2][0]);
 
+            // Get value of a determinant
             double aDeterminant = aMatrix[0][0] * (aMatrix[1][1] * aMatrix[2][2] - aMatrix[1][2] * aMatrix[2][1]);
             aDeterminant -= aMatrix[0][1] * (aMatrix[1][0] * aMatrix[2][2] - aMatrix[1][2] * aMatrix[2][0]);
             aDeterminant += aMatrix[0][2] * (aMatrix[1][0] * aMatrix[2][1] - aMatrix[1][1] * aMatrix[2][0]);
@@ -585,6 +602,7 @@ class Triangle: public Object{
             double beta = betaDeterminant / aDeterminant;
             double gamma = gammaDeterminant / aDeterminant;
 
+            // Check Conditions
             if(beta + gamma < 1 && beta > 0 && gamma > 0 && t > 0){
                 return t;
             }
@@ -612,6 +630,7 @@ class Sphere: public Object{
         }
 
 
+        // Draw Function for Sphere
         virtual void draw(){
             int stacks = 32, sectors = 16;
             struct Point3D spherePoints[stacks + 1][sectors + 1];
@@ -657,6 +676,7 @@ class Sphere: public Object{
             }     
         }
 
+        // Normal Ray at a point for a sphere
         virtual Ray normalRayAtPoint(Point3D point, Ray radius){
             Point3D normal = subtractTwoPoints(point, reference_point);
             normal.normalizePoint();
@@ -664,15 +684,20 @@ class Sphere: public Object{
             return normalRay;
         }
 
+        // Get Intersecting T Value for a sphere
         virtual double getIntersectingTValue(Ray ray){
             double a = 1;
             double b = 2 * (ray.direction.x_val * (ray.start_point.x_val - reference_point.x_val) + ray.direction.y_val * (ray.start_point.y_val - reference_point.y_val) + ray.direction.z_val * (ray.start_point.z_val - reference_point.z_val));
             double c = (ray.start_point.x_val - reference_point.x_val) * (ray.start_point.x_val - reference_point.x_val) + (ray.start_point.y_val - reference_point.y_val) * (ray.start_point.y_val - reference_point.y_val) + (ray.start_point.z_val - reference_point.z_val) * (ray.start_point.z_val - reference_point.z_val) - radius * radius;
 
+            // Calculate the discriminant
             double d = b * b - 4 * a * c;
+
+            // If the discriminant is negative, there are no real roots
             if(d < 0){
                 return -1;
             }
+            // return the value of intersecting t
             else{
                 double t1 = (-b + sqrt(d)) / (2 * a);
                 double t2 = (-b - sqrt(d)) / (2 * a);
@@ -726,10 +751,12 @@ class GeneralObject: public Object{
             J = j;
         }
 
+        // No Drawing as it is a general object
         virtual void draw(){
             return;
         }
 
+        // Normal Ray at a point for a general object
         virtual Ray normalRayAtPoint(Point3D point, Ray ray){
             Point3D normal = Point3D(2 * A * point.x_val + D * point.y_val + E * point.z_val + G, 2 * B * point.y_val + D * point.x_val + F * point.z_val + H, 2 * C * point.z_val + E * point.x_val + F * point.y_val + I);
             normal.normalizePoint();
@@ -775,26 +802,37 @@ class GeneralObject: public Object{
             }
                 double t1 = (-b + sqrt(d)) / (2 * a);
                 double t2 = (-b - sqrt(d)) / (2 * a);
-                double t;
-                if(t1 < 0 && t2 < 0){
+                double tMin = min(t1, t2);
+                double tMax = max(t1, t2);
+
+                if(tMin < 0 && tMax < 0){
                     return -1;
-                }
-                else if(t1 < 0){
-                    t = t2;
-                }
-                else if(t2 < 0){
-                    t = t1;
-                }
-                else{
-                    t = min(t1, t2);
                 }
 
-                Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, t));
-                if((length > 0.00001 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
-                    return -1;
+                else if(tMin > 0){
+                    Point3D intersectingPoint1 = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMin));
+                    if((length > 0.00001 && (intersectingPoint1.x_val < reference_point.x_val || intersectingPoint1.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint1.y_val < reference_point.y_val || intersectingPoint1.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint1.z_val < reference_point.z_val || intersectingPoint1.z_val > reference_point.z_val + height))){
+                        Point3D intersectingPoint2 = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMax));
+                        if((length > 0.00001 && (intersectingPoint2.x_val < reference_point.x_val || intersectingPoint2.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint2.y_val < reference_point.y_val || intersectingPoint2.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint2.z_val < reference_point.z_val || intersectingPoint2.z_val > reference_point.z_val + height))){
+                            return -1;
+                        }
+                        else{
+                            return tMax;
+                        }
+                    }
+                    else{
+                        return tMin;
+                    }
                 }
+
                 else{
-                    return t;
+                    Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMax));
+                    if((length > 0.00001 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
+                        return -1;
+                    }
+                    else{
+                        return tMax;
+                    }
                 }
             }
 

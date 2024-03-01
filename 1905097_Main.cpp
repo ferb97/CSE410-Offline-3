@@ -8,8 +8,6 @@ using namespace std;
 // Global Variables
 int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 70, countImage = 0;
 char title[] = "Ray Tracing";
-// double maxLength = 1.5, curLength = 1.5, changeRate = 0.1, fixedRadius = 0.577, radius = 0;
-// int rowPoints = 100;
 
 
 int recursion_level;
@@ -34,7 +32,7 @@ void loadData(){
 
 	in >> totalObjects;
 
-	for(int i=0;i<totalObjects;i++){
+	for(int i = 0;i < totalObjects; i++){
         string type;
         in >> type;
 
@@ -182,206 +180,9 @@ void capture(){
     }
 
     countImage++;
-    image.save_image("Output_2" + to_string(countImage) + ".bmp");
-	cout<<"Image Saved"<<endl;	
+    image.save_image("Output_1" + to_string(countImage) + ".bmp");
+	cout<<"Output Image Saved"<<endl;	
 }
-
-
-// // Drawing Three Axes
-// void drawThreeAxes(){
-//     glLineWidth(5);
-//     glBegin(GL_LINES);
-//         glColor3f(1, 1, 0);
-//         glVertex3f(0, 0, 0);
-//         glVertex3f(2, 0, 0);
-
-//         glColor3f(0, 1, 1);
-//         glVertex3f(0, 0, 0);
-//         glVertex3f(0, 2, 0);
-
-//         glColor3f(1, 0, 1);
-//         glVertex3f(0, 0, 0);
-//         glVertex3f(0, 0, 2);
-//     glEnd();    
-// }
-
-
-// // Drawing Base Triangle
-// void drawBaseTriangle(){
-//     glBegin(GL_TRIANGLES);
-//         glVertex3f(1, 0, 0);
-//         glVertex3f(0, 1, 0);
-//         glVertex3f(0, 0, 1);
-//     glEnd();    
-// }
-
-
-// // Ocathedron Upper Surface
-// void drawOctahedronUpper(){
-
-//     double translation = (maxLength - curLength) / 3.0;
-//     for(int i = 0; i < 4; i++){
-//         if(i % 2 == 0){
-//            glColor3d(0, 0, 1); 
-//         }
-//         else{
-//            glColor3d(0, 1, 0); 
-//         }
-
-//         glPushMatrix();
-//             glRotatef(90 * i, 0, 1, 0);
-//             glTranslatef(translation, translation, translation);
-//             glScaled(curLength, curLength, curLength);
-//             drawBaseTriangle();
-//         glPopMatrix();
-//     }
-// }
-
-
-// // Full Octahedron
-// void drawWholeOctahedron(){
-//     glPushMatrix();
-//         drawOctahedronUpper();
-//     glPopMatrix();
-
-//     glPushMatrix();
-//         glRotatef(180, 0, 0, 1);
-//         drawOctahedronUpper();
-//     glPopMatrix();    
-// }
-
-
-// // Draw One Face of Sphere
-// void drawSphereFace(){
-//     struct Point3D points[rowPoints][rowPoints];
-
-//     // Generate Points
-//     for(int i = 0; i < rowPoints; i++){
-//         double tmp2 = (acos(-1) / 180.0f) * (45.0f - 90.0f * i / (rowPoints - 1));
-//         struct Point3D point1 = Point3D(-sin(tmp2), cos(tmp2), 0);
-
-//         for(int j = 0; j < rowPoints; j++){
-//             double tmp1 = (acos(-1) / 180.0f) * (-45.0f + 90.0f * j / (rowPoints - 1));
-//             struct Point3D point2 = Point3D(-sin(tmp1), 0, -cos(tmp1));
-//             points[i][j] = multiplyTwoPoints(point1, point2);
-
-//             double len = sqrt(points[i][j].x_val * points[i][j].x_val + points[i][j].y_val * points[i][j].y_val + points[i][j].z_val * points[i][j].z_val);
-//             points[i][j] = dividePointByNumber(points[i][j], len);
-//             points[i][j] = multiplyPointWithNumber(points[i][j], fixedRadius);
-//         }
-//     }
-
-//     //  Generate Sphere Face Using Quads
-//     for(int i =  0; i < rowPoints - 1; i++){
-//         for(int j = 0; j < rowPoints - 1; j++){
-//             glBegin(GL_QUADS);
-//                 glVertex3f(points[i][j].x_val, points[i][j].y_val, points[i][j].z_val);
-//                 glVertex3f(points[i][j + 1].x_val, points[i][j + 1].y_val, points[i][j + 1].z_val);
-//                 glVertex3f(points[i + 1][j + 1].x_val, points[i + 1][j + 1].y_val, points[i + 1][j + 1].z_val);
-//                 glVertex3f(points[i + 1][j].x_val, points[i + 1][j].y_val, points[i + 1][j].z_val);
-//             glEnd();
-//         }
-//     }
-// }
-
-
-// // Draw One Sphere
-// void drawOneSphere(){
-//     glPushMatrix();
-//         glTranslated(-curLength, 0, 0);
-//         glScaled(radius, radius, radius);
-//         drawSphereFace();
-//     glPopMatrix();
-// }
-
-
-// // Draw All Spheres
-// void drawAllSpheres(){
-//     glPushMatrix();
-//     for(int i = 0; i < 4; i++){
-//         if(i % 2 == 0){
-//             glColor3f(1, 1, 0);
-//         }
-//         else{
-//             glColor3f(1, 0, 1);
-//         }
-
-//         drawOneSphere();
-//         glRotated(90, 0, 1, 0);
-//     }
-//     glPopMatrix();
-
-//     glPushMatrix();
-//         glColor3f(0, 1, 1);
-//         glRotated(90, 0, 0, 1);
-//         drawOneSphere();
-//         glRotated(180, 0, 0, 1);
-//         drawOneSphere();
-//     glPopMatrix();
-// }
-
-
-// // Draw Cylinder Face
-// void drawCylinderFace(){
-//     struct Point3D points1[rowPoints + 1];
-//     double angleDiff = acos(-1) - acos(-1 / 3.0);
-//     double height = curLength * sqrt(2);
-
-//     // Generate Points
-//     for(int i = 0; i <= rowPoints; i++){
-//         double angleTheta = -angleDiff / 2 +  i * angleDiff / rowPoints;
-//         points1[i] = Point3D(fixedRadius * cos(angleTheta), fixedRadius * sin(angleTheta), height / 2);
-//     }
-
-//     // Generate Cylinder Face Using Quads
-//     for(int i = 0; i < rowPoints; i++){
-//         glBegin(GL_QUADS);
-//             glVertex3f(points1[i].x_val, points1[i].y_val, points1[i].z_val);
-//             glVertex3f(points1[i].x_val, points1[i].y_val, -points1[i].z_val);
-//             glVertex3f(points1[i + 1].x_val, points1[i + 1].y_val, -points1[i + 1].z_val);
-//             glVertex3f(points1[i + 1].x_val, points1[i + 1].y_val, points1[i + 1].z_val);
-//         glEnd();
-//     }
-// }
-
-
-// // Draw One Cylinder
-// void drawOneCylinder(){
-
-//     glPushMatrix();
-//         glRotatef(45, 0, 1, 0);
-//         glTranslatef(curLength / sqrt(2), 0, 0);
-//         glScaled(radius, radius, 1);
-//         drawCylinderFace();
-//     glPopMatrix();
-// }
-
-
-// // Draw Four Cylinders
-// void drawCylindersForOneAxis(){
-//     glPushMatrix();
-//     for(int i = 0; i < 4; i++){
-//         glRotatef(90, 0, 1, 0);
-//         drawOneCylinder();
-//     }
-//     glPopMatrix();
-// }
-
-
-// // Draw All Cylinders
-// void drawAllCylinders(){
-//     glPushMatrix();
-//     glColor3f(1.0, 0, 0);
-
-//     drawCylindersForOneAxis();
-
-//     glRotatef(90, 1, 0, 0);
-//     drawCylindersForOneAxis();
-
-//     glRotatef(90, 0, 0, 1);
-//     drawCylindersForOneAxis();
-//     glPopMatrix();
-// }
 
 
 // Display Function
@@ -392,12 +193,6 @@ void display() {
    glLoadIdentity();       
 
    camera.startLooking();
-
-//    glRotatef(45, 0, 0, 1); 
-//    drawThreeAxes();
-//    drawWholeOctahedron();
-//    drawAllSpheres();
-//    drawAllCylinders();
 
     for (int i = 0; i < objects.size(); i++){
 		Object *object = objects[i];
