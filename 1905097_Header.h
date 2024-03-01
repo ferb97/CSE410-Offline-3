@@ -91,7 +91,7 @@ struct Camera
 
     // Constructor
     Camera(){
-        eye_pos = Point3D(300, 50, 100);
+        eye_pos = Point3D(150, 80, 50);
         lookat_dir = Point3D(-1 / sqrt(2), -1 / sqrt(2), 0);
         right_dir = Point3D(-1 / sqrt(2), 1 / sqrt(2), 0);
         up_dir = Point3D(0, 0, 1);
@@ -353,15 +353,22 @@ class Object{
 
                 // Get the direction of the light
                 Point3D lightDirection = subtractTwoPoints(intersectingPoint, pointLights[i]->light_pos);
+
+                // Calculate the distance with the light
                 double distanceWithLight = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
+
+                // If the distance is too small, continue
                 if(distanceWithLight < 0.00001){
                     continue;
                 }
 
                 lightDirection.normalizePoint();
+
+                // Create a light ray
                 Ray lightRay = Ray(pointLights[i]->light_pos, lightDirection);
                 bool isShadow = false;
 
+                // Check if the light is shadowed
                 for(int j = 0; j < objects.size(); j++){
                     double t1 = objects[j]->getIntersectingTValue(lightRay);
                     if(t1 > 0 && t1 + 0.00001 < distanceWithLight){
@@ -370,52 +377,72 @@ class Object{
                     }
                 }
 
+                // If not shadowed, calculate the color
                 if(!isShadow){
+
+                    // Calculate lambert value
                     double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, lightRay).direction) * (-1);
                     if(lambert < 0){
                         lambert = 0;
                     }
 
+                    // Calculate Diffuse component
                     for(int j = 0; j < 3; j++){
                         newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * pointLights[i]->color[j];
                     }
 
+                    // Calculate the reflection ray
                     Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, lightRay).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, lightRay).direction, lightRay.direction)));
                     Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
                     reflectionRay.direction.normalizePoint();
 
+                    // Calculate the phong value
                     double phong = dotProductOfTwoPoints(reflectionRay.direction, ray.direction) * (-1);
                     if(phong < 0){
                         phong = 0;
                     }
 
+                    // Calculate the specular component
                     for(int j = 0; j < 3; j++){
                         newColor[j] += coEfficients[2] * pow(phong, shine) * pointLights[i]->color[j] * colorAtIntersectingPoint[j];
                     }
                 }
             }
 
+
+            // Calculate for each spotlight
             for(int i = 0; i < spotlights.size(); i++){
+
+                // Get the direction of the light
                 Point3D lightDirection = subtractTwoPoints(intersectingPoint, spotlights[i]->point_light.light_pos);
+
+                // Calculate the distance with the light
                 double distanceWithLight = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
+
+                // If the distance is too small, continue
                 if(distanceWithLight < 0.00001){
                     continue;
                 }
 
                 lightDirection.normalizePoint();
 
+                // Calculate the angle between the light direction and the spotlight direction
                 double numerator = dotProductOfTwoPoints(lightDirection, spotlights[i]->light_direction);
                 double denominator = sqrt(lightDirection.x_val * lightDirection.x_val + lightDirection.y_val * lightDirection.y_val + lightDirection.z_val * lightDirection.z_val);
                 denominator *= sqrt(spotlights[i]->light_direction.x_val * spotlights[i]->light_direction.x_val + spotlights[i]->light_direction.y_val * spotlights[i]->light_direction.y_val + spotlights[i]->light_direction.z_val * spotlights[i]->light_direction.z_val);
 
                 double angle = acos(numerator / denominator) * (180 / acos(-1));
 
+                // If the angle is greater than the cutoff angle, continue
                 if(fabs(angle) >= spotlights[i]->cutoff_angle){
                     continue;
                 }
+
+                // Create a light ray
                 Ray lightRay = Ray(spotlights[i]->point_light.light_pos, lightDirection);
                 bool isShadow = false;
 
+                // Check if the light is shadowed
                 for(int j = 0; j < objects.size(); j++){
                     double t1 = objects[j]->getIntersectingTValue(lightRay);
                     if(t1 > 0 && t1 + 0.00001 < distanceWithLight){
@@ -424,25 +451,34 @@ class Object{
                     }
                 }
 
+
+                // If not shadowed, calculate the color
                 if(!isShadow){
+
+                    // Calculate lambert value
                     double lambert = dotProductOfTwoPoints(lightRay.direction, normalRayAtPoint(intersectingPoint, lightRay).direction) * (-1);
                     if(lambert < 0){
                         lambert = 0;
                     }
 
+                    // Calculate Diffuse component
                     for(int j = 0; j < 3; j++){
                         newColor[j] += coEfficients[1] * colorAtIntersectingPoint[j] * lambert * spotlights[i]->point_light.color[j];
                     }
 
+                    // Calculate the reflection ray
                     Point3D reflectionRayDirection = subtractTwoPoints(lightRay.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, lightRay).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, lightRay).direction, lightRay.direction)));
                     Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
                     reflectionRay.direction.normalizePoint();
 
+
+                    // Calculate the phong value
                     double phong = dotProductOfTwoPoints(reflectionRay.direction, ray.direction) * (-1);
                     if(phong < 0){
                         phong = 0;
                     }
 
+                    // Calculate the specular component
                     for(int j = 0; j < 3; j++){
                         newColor[j] += coEfficients[2] * pow(phong, shine) * spotlights[i]->point_light.color[j] * colorAtIntersectingPoint[j];
                     }
@@ -450,18 +486,24 @@ class Object{
 
             }
 
+            // Calculate the reflection
             if(level < recursion_level){
+
+                // Calculate the reflection ray
                 Point3D reflectionRayDirection = subtractTwoPoints(ray.direction, multiplyPointWithNumber(normalRayAtPoint(intersectingPoint, ray).direction, 2 * dotProductOfTwoPoints(normalRayAtPoint(intersectingPoint, ray).direction, ray.direction)));
                 Ray reflectionRay = Ray(intersectingPoint, reflectionRayDirection);
                 reflectionRay.direction.normalizePoint();
 
+                // Move the reflection ray a little bit to avoid self intersection
                 reflectionRay.start_point = addTwoPoints(reflectionRay.start_point, multiplyPointWithNumber(reflectionRay.direction, 0.00001));
 
+                // Declaring variables for reflection
                 double newColorAtIntersectingPoint[3] = {0.0, 0.0, 0.0};
                 double t1 = -1;
                 double minT = 1000000000;
                 int minIndex = -1;
 
+                // Check for intersection with all objects
                 for(int i = 0; i < objects.size(); i++){
                     t1 = objects[i]->intersect(reflectionRay, newColor, 0);
                     if(t1 > 0 && t1 < minT){
@@ -470,8 +512,12 @@ class Object{
                     }
                 }
 
+                // If there is an intersection, calculate the color
                 if(minIndex != -1){
+                    // Calculate the color at the intersecting point
                     double t2 = objects[minIndex]->intersect(reflectionRay, newColorAtIntersectingPoint, level + 1);
+
+                    // Calculate the reflection component
                     for(int i = 0; i < 3; i++){
                         newColor[i] += coEfficients[3] * newColorAtIntersectingPoint[i];
                     }
@@ -766,6 +812,8 @@ class GeneralObject: public Object{
 
         virtual double getIntersectingTValue(Ray ray){
 
+
+            // For quadratic equation, a * x^2 + b * x + c=0, get the values of a, b, and c
             double a = A * ray.direction.x_val * ray.direction.x_val; 
             a += B * ray.direction.y_val * ray.direction.y_val; 
             a += C * ray.direction.z_val * ray.direction.z_val;
@@ -792,7 +840,11 @@ class GeneralObject: public Object{
             c += I * ray.start_point.z_val;
             c += J;
 
+
+            // Calculate the discriminant
             double d = b * b - 4 * a * c;
+
+            // If the discriminant is negative, there are no real roots
             if(d < 0){
                 return -1;
             }
@@ -800,32 +852,46 @@ class GeneralObject: public Object{
             if(fabs(a) < 0.00001){
                 return -c / b;
             }
+
+                // Calculate tMin and tMax
                 double t1 = (-b + sqrt(d)) / (2 * a);
                 double t2 = (-b - sqrt(d)) / (2 * a);
                 double tMin = min(t1, t2);
                 double tMax = max(t1, t2);
 
+                // If both of them are negative, return -1
                 if(tMin < 0 && tMax < 0){
                     return -1;
                 }
 
                 else if(tMin > 0){
+
+                    // Calculate intersection point for tMin
                     Point3D intersectingPoint1 = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMin));
                     if((length > 0.00001 && (intersectingPoint1.x_val < reference_point.x_val || intersectingPoint1.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint1.y_val < reference_point.y_val || intersectingPoint1.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint1.z_val < reference_point.z_val || intersectingPoint1.z_val > reference_point.z_val + height))){
+
+                        // If the intersection point is outside the object, calculate intersection point for tMax
                         Point3D intersectingPoint2 = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMax));
+
+                        // If the intersection point is outside the object, return -1
                         if((length > 0.00001 && (intersectingPoint2.x_val < reference_point.x_val || intersectingPoint2.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint2.y_val < reference_point.y_val || intersectingPoint2.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint2.z_val < reference_point.z_val || intersectingPoint2.z_val > reference_point.z_val + height))){
                             return -1;
                         }
+                        // Else, return tMax
                         else{
                             return tMax;
                         }
                     }
+
+                    // Else, return tMin
                     else{
                         return tMin;
                     }
                 }
 
                 else{
+
+                    // Calculate intersection point for tMax
                     Point3D intersectingPoint = addTwoPoints(ray.start_point, multiplyPointWithNumber(ray.direction, tMax));
                     if((length > 0.00001 && (intersectingPoint.x_val < reference_point.x_val || intersectingPoint.x_val > reference_point.x_val + length)) || (width > 0.00001 && (intersectingPoint.y_val < reference_point.y_val || intersectingPoint.y_val > reference_point.y_val + width)) || (height > 0.00001 && (intersectingPoint.z_val < reference_point.z_val || intersectingPoint.z_val > reference_point.z_val + height))){
                         return -1;
@@ -857,16 +923,22 @@ class Floor: public Object{
             totalNumberOfTiles = floorWidth / tileWidth;
         }
 
+        // Draw Function for Floor
         virtual void draw(){
             double x = reference_point.x_val, y = reference_point.y_val;
+
             for(int i = 0; i < totalNumberOfTiles; i++){
                 for(int j = 0; j < totalNumberOfTiles; j++){
+
+                    // Alternate colors
                     if((i + j) % 2 == 0){
                         glColor3f(1, 1, 1);
                     }
                     else{
                         glColor3f(0, 0, 0);
                     }
+
+                    // Draw Tiles
                     glBegin(GL_QUADS);
                     {
                         glVertex3f(x, y, 0);
@@ -882,6 +954,7 @@ class Floor: public Object{
             }
         }
 
+        // Normal Ray at a point for a floor
         virtual Ray normalRayAtPoint(Point3D point, Ray ray){
             if(ray.direction.z_val > 0){
                 Point3D normal = Point3D(0, 0, 1);
@@ -897,6 +970,7 @@ class Floor: public Object{
             }   
         }
 
+        // Get Intersecting T Value for a floor
         virtual double getIntersectingTValue(Ray ray){
             if(ray.direction.z_val == 0){
                 return -1;
@@ -912,6 +986,7 @@ class Floor: public Object{
             }
         }
 
+        // Get Color at a point for a floor
         virtual double getColorRedAt(Point3D point){
             int tile_x = (point.x_val - reference_point.x_val) / length;
             int tile_y = (point.y_val - reference_point.y_val) / length;

@@ -10,21 +10,30 @@ int window_width = 800, window_height = 800, window_x_pos = 70, window_y_pos = 7
 char title[] = "Ray Tracing";
 
 
+// Necessary Variables
 int recursion_level;
 int imageHeight,imageWidth;
 bitmap_image image;
 
+// Vector of Objects, Point Lights and Spot Lights
 vector <Object*> objects;
 vector <PointLight*> pointLights;
 vector <SpotLight*> spotlights;
 
+// Camera
 Camera camera;
 
+
+// Load Data from Scene.txt
 void loadData(){
 
+    // Declaring Variables
     int number, totalObjects, totalPointLights, totalSpotLights;
 
+    // Reading Data from Scene.txt
     ifstream in("scene.txt");
+
+    // Taking input recusrion level and number of pixels
 	in >> recursion_level >> number;
 
 	imageWidth = number;
@@ -32,12 +41,16 @@ void loadData(){
 
 	in >> totalObjects;
 
+    // Taking Input Objects
 	for(int i = 0;i < totalObjects; i++){
+
+        // Object type Input
         string type;
         in >> type;
 
         Object *object;
 
+        // For Triangle Object
         if(type == "triangle"){
             object = new Triangle();
 
@@ -51,6 +64,8 @@ void loadData(){
             objects.push_back(object);
         }
 
+
+        // For Sphere Object
         else if(type == "sphere"){
             object = new Sphere();
 
@@ -63,6 +78,8 @@ void loadData(){
             objects.push_back(object);
         }
 
+
+        // For General Object
         else if(type == "general"){
             object = new GeneralObject();
 
@@ -101,6 +118,7 @@ void loadData(){
         spotlights.push_back(spotLight);
     }
 
+    // Adding Floor
 	Object *floorObject = new Floor(1000, 20);
     double floorColor[3] = {0.5, 0.5, 0.5};
 	floorObject->setColor(floorColor);
@@ -132,26 +150,35 @@ void capture(){
         }
     }
 
+    // Get top left pixel location
     double angleOfView = 80;
     double planeDistance = (imageHeight / 2.0) / tan((angleOfView / 2.0) * acos(-1) / 180.0);  
     Point3D topLeft = camera.getTopLeftPoint(planeDistance, window_width, window_height);
 
+    // Calculate du and dv
     double du = (window_width * 1.0) / imageWidth;
     double dv = (window_height * 1.0) / imageHeight;
 
+    // Calculating the top left pixel's mid point
     topLeft = addTwoPoints(topLeft, multiplyPointWithNumber(camera.right_dir, du / 2.0));
     topLeft = subtractTwoPoints(topLeft, multiplyPointWithNumber(camera.up_dir, dv / 2.0));
 
+    // Loop through each pixel
     for(int i = 0; i < imageWidth; i++){
         for(int j = 0; j < imageHeight; j++){
+
+            // Calculate the current pixel
             Point3D currentPixel = addTwoPoints(topLeft, multiplyPointWithNumber(camera.right_dir, i * du));
             currentPixel = subtractTwoPoints(currentPixel, multiplyPointWithNumber(camera.up_dir, j * dv));
 
+            // Create a ray from the eye to the current pixel
             Ray ray = Ray(camera.eye_pos, subtractTwoPoints(currentPixel, camera.eye_pos));
             ray.direction.normalizePoint();
-            double newColor[3] = {0.0, 0.0, 0.0};
 
+            double newColor[3] = {0.0, 0.0, 0.0};
             double tMin = 1000000000, nearestObject = -1;
+
+            // Loop through each object to find the nearest object
             for(int k = 0; k < objects.size(); k++){
                 double t = objects[k]->intersect(ray, newColor, 0);
                 if(t > 0 && (t < tMin || nearestObject == -1)){
@@ -160,12 +187,16 @@ void capture(){
                 }
             }
 
+            // If there is a nearest object, color the pixel with the object's color
             if(nearestObject != -1){
                 newColor[0] = 0.0;
                 newColor[1] = 0.0;
                 newColor[2] = 0.0;
 
+                // Calculate the color of the pixel
                 double t = objects[nearestObject]->intersect(ray, newColor, 1);
+
+                // The color of the pixel should be between 0 and 1
                 newColor[0] = min(1.0, newColor[0]);
                 newColor[0] = max(0.0, newColor[0]);
                 newColor[1] = min(1.0, newColor[1]);
@@ -173,12 +204,14 @@ void capture(){
                 newColor[2] = min(1.0, newColor[2]);
                 newColor[2] = max(0.0, newColor[2]);
 
+                // Set the pixel color
                 image.set_pixel(i, j, newColor[0] * 255, newColor[1] * 255, newColor[2] * 255);
             }
 
         }
     }
 
+    // Save the image
     countImage++;
     image.save_image("Output_1" + to_string(countImage) + ".bmp");
 	cout<<"Output Image Saved"<<endl;	
@@ -192,18 +225,22 @@ void display() {
  
    glLoadIdentity();       
 
+   // Set the camera 
    camera.startLooking();
 
+    // Draw Objects
     for (int i = 0; i < objects.size(); i++){
 		Object *object = objects[i];
 		object->draw();
 	}
 
+    // Draw Point Lights
     for (int i = 0; i < pointLights.size(); i++){
         PointLight *pointLight = pointLights[i];
         pointLight->drawPointLight();
     }
 
+    // Draw Spot Lights
     for (int i = 0; i < spotlights.size(); i++){
         SpotLight *spotLight = spotlights[i];
         spotLight->drawSpotLight();
@@ -212,6 +249,8 @@ void display() {
    glutSwapBuffers();
 }
 
+
+// Reshape Function
 void reshape(GLsizei width, GLsizei height) {
    
    if (height == 0) 
@@ -226,9 +265,6 @@ void reshape(GLsizei width, GLsizei height) {
    gluPerspective(80.0f, aspect, 1.0f, 1000.0f);
 }
 
-void animate(){
-    glutPostRedisplay();
-}
 
 // Keyboard Functionalities
 void keyboardListener(unsigned char key, int x, int y){
@@ -314,13 +350,13 @@ int main(int argc, char** argv){
    initGL();         
 
    glutDisplayFunc(display);     
-   glutReshapeFunc(reshape);
-   glutIdleFunc(animate);     
+   glutReshapeFunc(reshape);    
    glutKeyboardFunc(keyboardListener); 
    glutSpecialFunc(specialKeyboardListener);  
                   
    glutMainLoop();
 
+   // Clearing Memory
    objects.clear();
    objects.shrink_to_fit();
 
